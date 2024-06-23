@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./Scraper
+      dockerfile: Dockerfile-scraper
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/BA
+      - API_KEY=XXX
+      - TZ=Europe/Amsterdam
+      - NODE_ENV=production
+      - SEARCH_API_KEY=XXX
+    volumes:
+      - ./Scraper/src:/app/src
+      - profiledata:/app/websiteContents
+      - matchingdata:/app/matching/matches
+    ports:
+      - 3001:3001
+    restart: always
+    networks:
+      - MONGO
+    depends_on:
+      - mongo
+  profile:
+    build: 
+      context: ./Scraper
+      dockerfile: Dockerfile-profile
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/BA
+      - API_KEY=XXX
+      - TZ=Europe/Amsterdam
+      - NODE_ENV=production
+      - SEARCH_API_KEY=XXX
+    volumes:
+      - ./Scraper/src:/app/src
+      - profiledata:/app/websiteContents
+    restart: always
+    networks:
+      - MONGO
+    depends_on:
+      - mongo
+  frontend:
+    build:
+      context: ./Website
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    restart: always
+    networks:
+      - MONGO
+    depends_on:
+      - mongo
+      - backend
+  mongo:
+    # Don't forget to add 127.0.0.1 mongo to /etc/hosts
+    image: mongo
+    restart: always
+    command: [--replSet, my-replica-set, --bind_ip_all, --port, "27017"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: test $$(mongosh --port 27017 --quiet --eval "try {rs.initiate({_id:'my-replica-set',members:[{_id:0,host:\"mongo:27017\"}]})} catch(e) {rs.status().ok}") -eq 1
+      interval: 10s
+      start_period: 30s
+    # environment:
+      # MONGO_INITDB_ROOT_USERNAME: root
+      # MONGO_INITDB_ROOT_PASSWORD: example
+    networks:
+      - MONGO
+
+networks:
+  MONGO:
+    driver: bridge
+    name: MONGO
+  
+volumes:
+  mongodata:
+  profiledata:
+  matchingdata:
